@@ -1,59 +1,47 @@
 # burnscope
 
-`burnscope` is a local TypeScript CLI that turns Claude Code and Codex session artifacts into a burn report you can use immediately: prompt load, completion load, context growth, expensive turns, and session-limit risk.
+`burnscope` is a TypeScript CLI that turns Claude Code and Codex session artifacts into an immediate burn report: prompt load, completion load, context growth, expensive turns, operational warnings, and session-limit risk.
 
-It works directly against the formats that are actually present on this machine today:
-
-- Claude Code `~/.claude/history.jsonl`
-- Claude Code project transcripts in `~/.claude/projects/**.jsonl`
-- Codex `~/.codex/history.jsonl`
-- Codex rollout session transcripts in `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
-- Codex operational log `~/.codex/log/codex-tui.log`
+It works with common local artifacts produced by Claude Code and Codex, including JSONL history files, richer session transcripts, and operational logs.
 
 ![burnscope diagram](./assets/burnscope-diagram.svg)
 
 ## Why it is useful
 
-Heavy coding sessions do not fail all at once. They degrade:
+Heavy coding sessions rarely fail all at once. They degrade gradually:
 
 - prompts get longer
 - cached context keeps compounding
 - one or two slow turns start dominating the run
-- tool logs start throwing warnings while the session still looks "alive"
+- warnings start appearing while the session still looks usable
 
-`burnscope` gives you a local checkpoint before the session becomes expensive, sluggish, or close to the model limit.
+`burnscope` gives you a clear checkpoint before a session becomes expensive, sluggish, or close to hard limits.
 
-## What burnscope supports now
+## What burnscope supports
 
 ### Claude Code
 
 - `history.jsonl`: fast prompt-history analysis with token estimates derived from prompt text
-- project transcript JSONL files under `~/.claude/projects/`: richer analysis using assistant usage records when they are present
+- project transcript JSONL files: richer analysis using assistant usage records when they are present
 
 ### Codex
 
 - `history.jsonl`: fast prompt-history analysis with token estimates derived from prompt text
-- rollout session transcripts under `~/.codex/sessions/`: preferred input, because they contain per-turn token counts
+- rollout session transcripts: preferred input, because they can contain per-turn token counts
 - `codex-tui.log`: operational warning/error scan for local troubleshooting
 - `session_index.jsonl`: useful for discovering recent thread IDs before opening the matching rollout file
 
 ### Codex SQLite log store
 
-`~/.codex/logs_1.sqlite` is accessible on this machine and contains operational logs in a `logs` table. `burnscope` does not read SQLite directly yet. The practical workflow tonight is:
+Some Codex setups also maintain a SQLite operational log store such as `logs_1.sqlite`. `burnscope` does not read SQLite directly yet. A practical workflow is to export recent rows with `sqlite3` and use transcript/log files for the main burn analysis.
 
-```bash
-sqlite3 ~/.codex/logs_1.sqlite \
-  "select ts, level, target, feedback_log_body from logs order by id desc limit 200;" > codex-log-export.txt
-
-burnscope ~/.codex/log/codex-tui.log
-```
-
-For burn analysis, prefer the rollout session JSONL files over the SQLite store.
+For burn analysis, prefer rollout session JSONL files over the SQLite store whenever they are available.
 
 ## Install and run
 
 ```bash
-cd /Users/mulugeta/.openclaw/workspace/burnscope
+git clone https://github.com/clawnetes/burnscope.git
+cd burnscope
 npm install
 npm run demo
 ```
@@ -83,13 +71,13 @@ npx tsx src/cli.ts ~/.claude/history.jsonl
 Analyze a Claude Code transcript with real usage records:
 
 ```bash
-npx tsx src/cli.ts ~/.claude/projects/.../session.jsonl
+npx tsx src/cli.ts /path/to/claude-project-session.jsonl
 ```
 
 Analyze a Codex rollout session:
 
 ```bash
-npx tsx src/cli.ts ~/.codex/sessions/2026/03/20/rollout-2026-03-20T22-13-33-019d0d4f-98ac-7e23-b735-5dbd18720af5.jsonl
+npx tsx src/cli.ts /path/to/rollout-session.jsonl
 ```
 
 Analyze Codex operational warnings:
@@ -100,7 +88,7 @@ npx tsx src/cli.ts ~/.codex/log/codex-tui.log
 
 ## Output
 
-The terminal summary now shows:
+The terminal summary shows:
 
 - source type and detected provider
 - session ID when it is available
@@ -115,7 +103,7 @@ The JSON report includes source metadata and the computed analysis payload.
 ```text
 burnscope
 codex / codex-session
-  Source             /Users/.../rollout-....jsonl
+  Source             /path/to/rollout-session.jsonl
   Summary            Codex rollout session transcript
   Session            019d0d4f-98ac-7e23-b735-5dbd18720af5
 
@@ -133,7 +121,7 @@ Risk
 
 ## JSON event format
 
-You can still feed burnscope a normalized event log directly:
+You can also feed burnscope a normalized event log directly:
 
 ```json
 {
