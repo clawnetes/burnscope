@@ -1,0 +1,30 @@
+{
+  "name": "burnscope",
+  "version": "0.1.0",
+  "description": "CLI observability and budget control for AI coding sessions",
+  "type": "module",
+  "bin": {
+    "burnscope": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "demo": "tsx src/cli.ts samples/demo-session.jsonl --report reports/demo-report.json",
+    "test": "tsx --test tests/**/*.test.ts",
+    "start": "tsx src/cli.ts"
+  },
+  "keywords": [
+    "cli",
+    "typescript",
+    "observability",
+    "ai",
+    "codex",
+    "claude-code"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

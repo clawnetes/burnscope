@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="420" viewBox="0 0 880 420" role="img" aria-labelledby="title desc">
+  <title id="title">burnscope CLI flow</title>
+  <desc id="desc">Diagram showing session logs flowing into burnscope analysis and producing warnings and reports.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1320"/>
+      <stop offset="100%" stop-color="#16263d"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#153258"/>
+      <stop offset="100%" stop-color="#214a75"/>
+    </linearGradient>
+  </defs>
+  <rect width="880" height="420" rx="28" fill="url(#bg)"/>
+  <text x="60" y="70" fill="#f8fbff" font-family="Menlo, Monaco, monospace" font-size="28" font-weight="700">burnscope</text>
+  <text x="60" y="102" fill="#8eb8ff" font-family="Menlo, Monaco, monospace" font-size="14">AI coding session observability + burn control</text>
+
+  <rect x="60" y="150" width="220" height="170" rx="18" fill="url(#panel)" stroke="#6ea8ff" stroke-width="2"/>
+  <text x="85" y="188" fill="#ffffff" font-family="Menlo, Monaco, monospace" font-size="18">Session logs</text>
+  <text x="85" y="220" fill="#d5e7ff" font-family="Menlo, Monaco, monospace" font-size="14">JSON / JSONL</text>
+  <text x="85" y="245" fill="#d5e7ff" font-family="Menlo, Monaco, monospace" font-size="14">Claude Code / Codex</text>
+  <text x="85" y="270" fill="#d5e7ff" font-family="Menlo, Monaco, monospace" font-size="14">Prompt + context events</text>
+
+  <rect x="330" y="120" width="240" height="230" rx="18" fill="#f5f9ff" stroke="#1c4e80" stroke-width="2"/>
+  <text x="360" y="165" fill="#17324d" font-family="Menlo, Monaco, monospace" font-size="18">burnscope analyze</text>
+  <text x="360" y="205" fill="#35516e" font-family="Menlo, Monaco, monospace" font-size="14">- total prompts</text>
+  <text x="360" y="230" fill="#35516e" font-family="Menlo, Monaco, monospace" font-size="14">- context growth</text>
+  <text x="360" y="255" fill="#35516e" font-family="Menlo, Monaco, monospace" font-size="14">- burn score</text>
+  <text x="360" y="280" fill="#35516e" font-family="Menlo, Monaco, monospace" font-size="14">- expensive step warnings</text>
+  <text x="360" y="305" fill="#35516e" font-family="Menlo, Monaco, monospace" font-size="14">- likely limit risk</text>
+
+  <rect x="620" y="150" width="200" height="70" rx="16" fill="#112f26" stroke="#52d19d" stroke-width="2"/>
+  <text x="650" y="193" fill="#dffff0" font-family="Menlo, Monaco, monospace" font-size="16">Terminal summary</text>
+
+  <rect x="620" y="250" width="200" height="70" rx="16" fill="#3b2410" stroke="#ffb067" stroke-width="2"/>
+  <text x="662" y="293" fill="#fff0df" font-family="Menlo, Monaco, monospace" font-size="16">JSON report</text>
+
+  <path d="M280 235 C300 235, 315 235, 330 235" stroke="#8eb8ff" stroke-width="4" fill="none"/>
+  <path d="M570 190 C590 190, 605 190, 620 190" stroke="#52d19d" stroke-width="4" fill="none"/>
+  <path d="M570 285 C590 285, 605 285, 620 285" stroke="#ffb067" stroke-width="4" fill="none"/>
+  <circle cx="305" cy="235" r="6" fill="#8eb8ff"/>
+  <circle cx="595" cy="190" r="6" fill="#52d19d"/>
+  <circle cx="595" cy="285" r="6" fill="#ffb067"/>
+</svg>

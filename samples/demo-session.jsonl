@@ -1,0 +1,8 @@
+{"ts":"2026-03-30T08:00:00.000Z","type":"session.start","step":"boot","contextTokens":1200,"durationMs":1000}
+{"ts":"2026-03-30T08:02:10.000Z","type":"prompt","step":"triage-issue","promptTokens":850,"completionTokens":300,"contextTokens":2400,"durationMs":12000,"model":"claude-code"}
+{"ts":"2026-03-30T08:07:12.000Z","type":"prompt","step":"scan-repo","promptTokens":1300,"completionTokens":420,"contextTokens":5200,"durationMs":28000,"model":"claude-code"}
+{"ts":"2026-03-30T08:18:48.000Z","type":"prompt","step":"rewrite-parser","promptTokens":2100,"completionTokens":760,"contextTokens":12100,"durationMs":98000,"model":"codex"}
+{"ts":"2026-03-30T08:27:14.000Z","type":"tool.result","step":"tests","contextTokens":14800,"durationMs":44000}
+{"ts":"2026-03-30T08:35:53.000Z","type":"prompt","step":"add-fixtures","promptTokens":1650,"completionTokens":580,"contextTokens":17600,"durationMs":65000,"model":"codex"}
+{"ts":"2026-03-30T08:51:17.000Z","type":"prompt","step":"debug-failure","promptTokens":2400,"completionTokens":920,"contextTokens":24100,"durationMs":132000,"model":"claude-code"}
+{"ts":"2026-03-30T09:02:04.000Z","type":"session.end","step":"done","contextTokens":24100,"durationMs":500}
