@@ -18,6 +18,7 @@ test("analyzeSession computes prompts, growth, warnings, and risk", () => {
   assert.equal(result.peakContextTokens, 8400);
   assert.equal(result.expensiveStepWarnings.length, 1);
   assert.equal(result.expensiveStepWarnings[0]?.step, "edit");
+  assert.equal(result.expensiveStepWarnings[0]?.completionTokens, 600);
   assert.equal(result.likelyLimitRisk.level, "medium");
   assert.ok(result.estimatedBurnScore > 0);
 });
@@ -33,4 +34,20 @@ test("analyzeSession stays low risk for compact sessions", () => {
   assert.equal(result.expensiveStepWarnings.length, 0);
   assert.equal(result.likelyLimitRisk.level, "low");
   assert.equal(result.totalContextGrowth, 1800);
+});
+
+test("analyzeSession counts model calls, warnings, and errors", () => {
+  const events: SessionEvent[] = [
+    { ts: "2026-03-30T10:00:00.000Z", type: "model.call", step: "turn-1", promptTokens: 1200, completionTokens: 450, contextTokens: 3200 },
+    { ts: "2026-03-30T10:01:00.000Z", type: "warning", step: "codex_core::skills::loader", metadata: { severity: "warning" } },
+    { ts: "2026-03-30T10:02:00.000Z", type: "warning", step: "codex_core::runner", metadata: { severity: "error" } }
+  ];
+
+  const result = analyzeSession(events);
+
+  assert.equal(result.totalPrompts, 1);
+  assert.equal(result.totalPromptTokens, 1200);
+  assert.equal(result.totalCompletionTokens, 450);
+  assert.equal(result.warningsObserved, 2);
+  assert.equal(result.errorsObserved, 1);
 });

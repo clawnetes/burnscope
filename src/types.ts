@@ -5,7 +5,19 @@ export type SessionEventType =
   | "model.call"
   | "tool.result"
   | "warning"
+  | "error"
   | "session.end";
+
+export type SessionInputFormat =
+  | "auto"
+  | "events"
+  | "claude-history"
+  | "claude-project"
+  | "codex-history"
+  | "codex-session"
+  | "codex-log";
+
+export type SessionProvider = "generic" | "claude-code" | "codex";
 
 export interface SessionEvent {
   ts: string;
@@ -20,11 +32,26 @@ export interface SessionEvent {
   metadata?: Record<string, unknown>;
 }
 
+export interface SessionSource {
+  path: string;
+  format: Exclude<SessionInputFormat, "auto">;
+  provider: SessionProvider;
+  summary: string;
+  notes: string[];
+  detectedSessionId?: string;
+}
+
+export interface LoadedSession {
+  events: SessionEvent[];
+  source: SessionSource;
+}
+
 export interface ExpensiveStepWarning {
   step: string;
   ts: string;
   reason: string;
   promptTokens: number;
+  completionTokens: number;
   contextTokens: number;
   durationMs: number;
   burnScoreImpact: number;
@@ -44,6 +71,8 @@ export interface SessionAnalysis {
   totalCompletionTokens: number;
   peakContextTokens: number;
   totalContextGrowth: number;
+  warningsObserved: number;
+  errorsObserved: number;
   estimatedBurnScore: number;
   expensiveStepWarnings: ExpensiveStepWarning[];
   likelyLimitRisk: LimitRiskSummary;

@@ -1,40 +1,56 @@
 # burnscope
 
-`burnscope` is a fast TypeScript CLI for one painful question every heavy AI coding session creates: are we still moving, or are we quietly burning budget and heading toward context limits?
+`burnscope` is a local TypeScript CLI that turns Claude Code and Codex session artifacts into a burn report you can use immediately: prompt load, completion load, context growth, expensive turns, and session-limit risk.
 
-It ingests session event logs from Claude Code, Codex, or similar agentic coding tools and turns them into a local burn report with zero dashboard work.
+It works directly against the formats that are actually present on this machine today:
+
+- Claude Code `~/.claude/history.jsonl`
+- Claude Code project transcripts in `~/.claude/projects/**.jsonl`
+- Codex `~/.codex/history.jsonl`
+- Codex rollout session transcripts in `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
+- Codex operational log `~/.codex/log/codex-tui.log`
 
 ![burnscope diagram](./assets/burnscope-diagram.svg)
 
-## Why this exists
+## Why it is useful
 
-Long coding sessions drift. Prompts get bigger, context balloons, slow steps pile up, and nobody notices until the model gets expensive, sluggish, or close to hard limits. `burnscope` gives you a fast local checkpoint before that happens.
+Heavy coding sessions do not fail all at once. They degrade:
 
-## Pains solved
+- prompts get longer
+- cached context keeps compounding
+- one or two slow turns start dominating the run
+- tool logs start throwing warnings while the session still looks "alive"
 
-- You cannot quickly explain why a session suddenly got expensive.
-- Prompt count alone hides the real cost driver: compounding context growth.
-- Agentic sessions produce "one bad step" moments that are easy to miss.
-- Teams need a machine-readable artifact they can save, diff, or feed into later automation.
+`burnscope` gives you a local checkpoint before the session becomes expensive, sluggish, or close to the model limit.
 
-## Benefits
+## What burnscope supports now
 
-- Works locally as a CLI, so it is fast to ship and easy to automate.
-- Reads plain JSON or JSONL logs.
-- Computes the MVP signals that actually matter: prompt volume, context growth, burn score, expensive steps, and limit risk.
-- Prints a human summary and writes a JSON report for pipelines.
+### Claude Code
 
-## MVP scope
+- `history.jsonl`: fast prompt-history analysis with token estimates derived from prompt text
+- project transcript JSONL files under `~/.claude/projects/`: richer analysis using assistant usage records when they are present
 
-- TypeScript CLI
-- JSON / JSONL ingestion
-- Session analysis engine
-- Terminal summary
-- JSON report output
-- Sample session data
-- Tests for the analysis logic
+### Codex
 
-## Quickstart
+- `history.jsonl`: fast prompt-history analysis with token estimates derived from prompt text
+- rollout session transcripts under `~/.codex/sessions/`: preferred input, because they contain per-turn token counts
+- `codex-tui.log`: operational warning/error scan for local troubleshooting
+- `session_index.jsonl`: useful for discovering recent thread IDs before opening the matching rollout file
+
+### Codex SQLite log store
+
+`~/.codex/logs_1.sqlite` is accessible on this machine and contains operational logs in a `logs` table. `burnscope` does not read SQLite directly yet. The practical workflow tonight is:
+
+```bash
+sqlite3 ~/.codex/logs_1.sqlite \
+  "select ts, level, target, feedback_log_body from logs order by id desc limit 200;" > codex-log-export.txt
+
+burnscope ~/.codex/log/codex-tui.log
+```
+
+For burn analysis, prefer the rollout session JSONL files over the SQLite store.
+
+## Install and run
 
 ```bash
 cd /Users/mulugeta/.openclaw/workspace/burnscope
@@ -42,67 +58,82 @@ npm install
 npm run demo
 ```
 
-You can also analyze your own log file:
+## CLI usage
 
 ```bash
-npx tsx src/cli.ts /path/to/session.jsonl --report reports/custom-report.json
+burnscope [input] [--report reports/out.json] [--format auto|events|claude-history|claude-project|codex-history|codex-session|codex-log]
 ```
 
-## Demo
+If you omit `input`, burnscope analyzes `samples/demo-session.jsonl`.
 
-Demo input:
+## Examples
 
-```bash
-samples/demo-session.jsonl
-```
-
-Demo command:
+Analyze the bundled demo:
 
 ```bash
 npm run demo
 ```
 
-Example terminal output:
+Analyze Claude Code prompt history:
+
+```bash
+npx tsx src/cli.ts ~/.claude/history.jsonl
+```
+
+Analyze a Claude Code transcript with real usage records:
+
+```bash
+npx tsx src/cli.ts ~/.claude/projects/.../session.jsonl
+```
+
+Analyze a Codex rollout session:
+
+```bash
+npx tsx src/cli.ts ~/.codex/sessions/2026/03/20/rollout-2026-03-20T22-13-33-019d0d4f-98ac-7e23-b735-5dbd18720af5.jsonl
+```
+
+Analyze Codex operational warnings:
+
+```bash
+npx tsx src/cli.ts ~/.codex/log/codex-tui.log
+```
+
+## Output
+
+The terminal summary now shows:
+
+- source type and detected provider
+- session ID when it is available
+- strong color-coded burn and risk labels
+- warning/error counts
+- expensive-step hierarchy with timestamps, reasons, and token/duration stats
+
+The JSON report includes source metadata and the computed analysis payload.
+
+## Demo output
 
 ```text
 burnscope
----------
-Prompts: 5
-Prompt tokens: 8300
-Completion tokens: 2980
-Peak context: 24100
-Context growth: 24100
-Estimated burn score: 10.66 (healthy)
-Likely limit risk: high - Context is already large and recent steps are trending toward session limits.
-Expensive steps:
-- 2026-03-30T08:18:48.000Z rewrite-parser: large prompt, slow step (prompt=2100, context=12100, durationMs=98000, impact=3.02)
-- 2026-03-30T08:51:17.000Z debug-failure: large prompt, heavy context, slow step, high burn impact (prompt=2400, context=24100, durationMs=132000, impact=4.44)
+codex / codex-session
+  Source             /Users/.../rollout-....jsonl
+  Summary            Codex rollout session transcript
+  Session            019d0d4f-98ac-7e23-b735-5dbd18720af5
 
-JSON report written to reports/demo-report.json
+Overview
+  Turns analyzed     1
+  Prompt tokens      3400
+  Completion tokens  720
+  Peak context       4200
+  Context growth     4200
+
+Risk
+  Burn score         3.89 HEALTHY
+  Limit risk         LOW Context growth is controlled and current steps are unlikely to hit hard limits soon.
 ```
 
-Example JSON report shape:
+## JSON event format
 
-```json
-{
-  "product": "burnscope",
-  "source": "samples/demo-session.jsonl",
-  "generatedAt": "2026-03-30T00:00:00.000Z",
-  "analysis": {
-    "totalPrompts": 5,
-    "totalContextGrowth": 24100,
-    "estimatedBurnScore": 18.61,
-    "expensiveStepWarnings": [],
-    "likelyLimitRisk": {
-      "level": "high"
-    }
-  }
-}
-```
-
-## JSON log format
-
-Each line or JSON object can contain:
+You can still feed burnscope a normalized event log directly:
 
 ```json
 {
@@ -125,15 +156,8 @@ npm test
 npm run build
 ```
 
-## Design notes
+## Notes
 
-- No web app. CLI-first by design for speed and low overhead.
-- Minimal dependencies: TypeScript + `tsx`.
-- Heuristic burn scoring is intentionally simple in this MVP so it is easy to audit and replace later.
-
-## Next obvious extensions
-
-- Per-model cost estimation
-- Session comparison across runs
-- Threshold configuration flags
-- CI budget gates
+- `history.jsonl` adapters estimate tokens from text length because those files do not expose usage directly.
+- Claude project transcripts and Codex rollout transcripts are the best inputs when you want real per-turn usage.
+- `codex-tui.log` is useful for operational failures, but it is not a substitute for a full session transcript.

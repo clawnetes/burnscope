@@ -1,0 +1,2 @@
+2026-03-12T14:16:46.654329Z  WARN codex_core::skills::loader: missing skill symlink
+2026-03-12T14:16:50.654329Z  ERROR codex_core::runner: failed to open session database

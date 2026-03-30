@@ -20,6 +20,8 @@ export function analyzeSession(events: SessionEvent[]): SessionAnalysis {
   let lastContextTokens = 0;
   let recentGrowthTotal = 0;
   let recentGrowthSteps = 0;
+  let warningsObserved = 0;
+  let errorsObserved = 0;
   const expensiveStepWarnings: ExpensiveStepWarning[] = [];
 
   for (const event of orderedEvents) {
@@ -27,11 +29,23 @@ export function analyzeSession(events: SessionEvent[]): SessionAnalysis {
     const completionTokens = event.completionTokens ?? 0;
     const contextTokens = event.contextTokens ?? lastContextTokens;
     const durationMs = event.durationMs ?? 0;
+    const isEstimated = event.metadata?.estimated === true;
 
-    if (event.type === "prompt") {
+    if (event.type === "prompt" || event.type === "model.call") {
       totalPrompts += 1;
       totalPromptTokens += promptTokens;
       totalCompletionTokens += completionTokens;
+    }
+
+    if (event.type === "warning") {
+      warningsObserved += 1;
+      if (event.metadata?.severity === "error") {
+        errorsObserved += 1;
+      }
+    }
+
+    if (event.type === "error") {
+      errorsObserved += 1;
     }
 
     if (contextTokens > 0) {
@@ -54,22 +68,35 @@ export function analyzeSession(events: SessionEvent[]): SessionAnalysis {
       durationMs / 180000;
 
     const isWarningCandidate = event.type === "prompt" || event.type === "model.call" || event.type === "tool.result";
+    const estimatedHeavyStep =
+      isEstimated &&
+      promptTokens >= 200 &&
+      (contextTokens >= 24000 || burnImpact >= 4.2);
     const isExpensive =
       isWarningCandidate &&
-      (promptTokens >= 1800 || contextTokens >= 18000 || durationMs >= 90000 || burnImpact >= 3.4);
+      (promptTokens >= 1800 ||
+        (!isEstimated && contextTokens >= 18000) ||
+        durationMs >= 90000 ||
+        (!isEstimated && burnImpact >= 3.4) ||
+        estimatedHeavyStep);
 
     if (isExpensive) {
       const reasons = [];
       if (promptTokens >= 1800) reasons.push("large prompt");
-      if (contextTokens >= 18000) reasons.push("heavy context");
+      if ((!isEstimated && contextTokens >= 18000) || (isEstimated && contextTokens >= 24000)) {
+        reasons.push("heavy context");
+      }
       if (durationMs >= 90000) reasons.push("slow step");
-      if (burnImpact >= 3.4) reasons.push("high burn impact");
+      if ((!isEstimated && burnImpact >= 3.4) || (isEstimated && burnImpact >= 4.2)) {
+        reasons.push("high burn impact");
+      }
 
       expensiveStepWarnings.push({
         step: event.step ?? event.type,
         ts: event.ts,
         reason: reasons.join(", "),
         promptTokens,
+        completionTokens,
         contextTokens,
         durationMs,
         burnScoreImpact: round(burnImpact)
@@ -98,6 +125,8 @@ export function analyzeSession(events: SessionEvent[]): SessionAnalysis {
     totalCompletionTokens,
     peakContextTokens,
     totalContextGrowth,
+    warningsObserved,
+    errorsObserved,
     estimatedBurnScore,
     expensiveStepWarnings,
     likelyLimitRisk
