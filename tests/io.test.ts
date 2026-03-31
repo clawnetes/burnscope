@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import os from "node:os";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 
-import { loadSession } from "../src/io.js";
+import { loadSession, resolveInputPath } from "../src/io.js";
 
 const fixturesDir = path.resolve("tests/fixtures");
 
@@ -53,4 +55,59 @@ test("loadSession highlights Codex WARN and ERROR log lines", async () => {
   assert.equal(loaded.events.length, 2);
   assert.equal(loaded.events[0]?.type, "warning");
   assert.equal(loaded.events[1]?.metadata?.severity, "error");
+});
+
+test("resolveInputPath auto-detects the newest Codex rollout session before older history files", async () => {
+  const homeDir = await mkdtemp(path.join(os.tmpdir(), "burnscope-home-"));
+  const codexHistory = path.join(homeDir, ".codex", "history.jsonl");
+  const codexSession = path.join(homeDir, ".codex", "sessions", "2026", "03", "31", "rollout-latest.jsonl");
+  const claudeHistory = path.join(homeDir, ".claude", "history.jsonl");
+
+  await mkdir(path.dirname(codexHistory), { recursive: true });
+  await mkdir(path.dirname(codexSession), { recursive: true });
+  await mkdir(path.dirname(claudeHistory), { recursive: true });
+
+  await writeFile(codexHistory, '{"session_id":"old","ts":1,"text":"older codex history"}\n', "utf8");
+  await writeFile(claudeHistory, '{"display":"older claude history","timestamp":2,"sessionId":"claude-1"}\n', "utf8");
+  await writeFile(
+    codexSession,
+    '{"timestamp":"2026-03-31T12:00:00.000Z","type":"session_meta","payload":{"id":"codex-session-1","model":"gpt-5.4"}}\n',
+    "utf8"
+  );
+
+  const originalHome = process.env.HOME;
+  process.env.HOME = homeDir;
+
+  try {
+    const resolved = await resolveInputPath();
+    assert.equal(resolved.discovered, true);
+    assert.equal(resolved.path, codexSession);
+    assert.match(resolved.discoveryNote ?? "", /latest Codex rollout session/i);
+  } finally {
+    process.env.HOME = originalHome;
+  }
+});
+
+test("resolveInputPath honors a format-specific discovery request", async () => {
+  const homeDir = await mkdtemp(path.join(os.tmpdir(), "burnscope-home-"));
+  const claudeProject = path.join(homeDir, ".claude", "projects", "demo", "session.jsonl");
+
+  await mkdir(path.dirname(claudeProject), { recursive: true });
+  await writeFile(
+    claudeProject,
+    '{"sessionId":"claude-project-1","cwd":"/tmp/demo","timestamp":"2026-03-31T09:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"Check the session."}]}}\n',
+    "utf8"
+  );
+
+  const originalHome = process.env.HOME;
+  process.env.HOME = homeDir;
+
+  try {
+    const resolved = await resolveInputPath(undefined, { format: "claude-project" });
+    assert.equal(resolved.discovered, true);
+    assert.equal(resolved.path, claudeProject);
+    assert.match(resolved.discoveryNote ?? "", /latest Claude Code project transcript/i);
+  } finally {
+    process.env.HOME = originalHome;
+  }
 });

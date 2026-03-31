@@ -1,5 +1,6 @@
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { readdir, readFile, mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 
 import type { LoadedSession, SessionEvent, SessionInputFormat, SessionSource } from "./types.js";
 
@@ -56,6 +57,44 @@ export async function loadSession(filePath: string, options: LoadSessionOptions 
     default:
       throw new Error(`Unsupported format: ${detectedFormat satisfies never}`);
   }
+}
+
+export async function resolveInputPath(
+  requestedInput?: string,
+  options: LoadSessionOptions = {}
+): Promise<{ path: string; discovered: boolean; discoveryNote?: string }> {
+  if (requestedInput) {
+    return {
+      path: requestedInput,
+      discovered: false
+    };
+  }
+
+  if (options.format !== undefined && options.format !== "auto" && options.format !== "events") {
+    const discovered = await discoverLatestArtifact(options.format);
+    if (discovered) {
+      return {
+        path: discovered.path,
+        discovered: true,
+        discoveryNote: discovered.note
+      };
+    }
+  }
+
+  const autoDiscovered = await discoverBestDefaultArtifact();
+  if (autoDiscovered) {
+    return {
+      path: autoDiscovered.path,
+      discovered: true,
+      discoveryNote: autoDiscovered.note
+    };
+  }
+
+  return {
+    path: path.resolve("samples/demo-session.jsonl"),
+    discovered: false,
+    discoveryNote: "No local Claude Code or Codex artifacts were found, so burnscope fell back to the bundled demo session."
+  };
 }
 
 function providerForFormat(format: Exclude<SessionInputFormat, "auto">): SessionSource["provider"] {
@@ -474,6 +513,120 @@ function durationBetween(start: string, end: string): number | undefined {
   }
 
   return Math.max(0, endTime - startTime);
+}
+
+async function discoverBestDefaultArtifact(): Promise<{ path: string; note: string } | undefined> {
+  const candidates = await Promise.all([
+    discoverLatestArtifact("codex-session"),
+    discoverLatestArtifact("claude-project"),
+    discoverLatestArtifact("codex-log"),
+    discoverLatestArtifact("claude-history"),
+    discoverLatestArtifact("codex-history")
+  ]);
+
+  const found = candidates.filter((candidate): candidate is { path: string; note: string; mtimeMs: number } =>
+    candidate !== undefined
+  );
+  if (found.length === 0) {
+    return undefined;
+  }
+
+  found.sort((left, right) => right.mtimeMs - left.mtimeMs);
+  const best = found[0];
+  return { path: best.path, note: best.note };
+}
+
+async function discoverLatestArtifact(
+  format: Exclude<SessionInputFormat, "auto" | "events">
+): Promise<{ path: string; note: string; mtimeMs: number } | undefined> {
+  const home = os.homedir();
+
+  switch (format) {
+    case "claude-history":
+      return statCandidate(path.join(home, ".claude", "history.jsonl"), "Auto-detected Claude Code history.");
+    case "claude-project":
+      return findNewestFile(path.join(home, ".claude", "projects"),
+        (candidate) => candidate.endsWith(".jsonl"),
+        "Auto-detected the latest Claude Code project transcript.");
+    case "codex-history":
+      return statCandidate(path.join(home, ".codex", "history.jsonl"), "Auto-detected Codex history.");
+    case "codex-session":
+      return findNewestFile(path.join(home, ".codex", "sessions"),
+        (candidate) => candidate.endsWith(".jsonl") && path.basename(candidate).startsWith("rollout-"),
+        "Auto-detected the latest Codex rollout session transcript.");
+    case "codex-log":
+      return statCandidate(path.join(home, ".codex", "log", "codex-tui.log"), "Auto-detected the Codex operational log.");
+    default:
+      return undefined;
+  }
+}
+
+async function statCandidate(
+  candidatePath: string,
+  note: string
+): Promise<{ path: string; note: string; mtimeMs: number } | undefined> {
+  try {
+    const candidateStat = await stat(candidatePath);
+    if (!candidateStat.isFile()) {
+      return undefined;
+    }
+
+    return {
+      path: candidatePath,
+      note,
+      mtimeMs: candidateStat.mtimeMs
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+async function findNewestFile(
+  root: string,
+  matches: (candidatePath: string) => boolean,
+  note: string
+): Promise<{ path: string; note: string; mtimeMs: number } | undefined> {
+  const queue = [root];
+  let best: { path: string; note: string; mtimeMs: number } | undefined;
+
+  while (queue.length > 0) {
+    const current = queue.pop();
+    if (!current) continue;
+
+    let entries;
+    try {
+      entries = await readdir(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const candidatePath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        queue.push(candidatePath);
+        continue;
+      }
+
+      if (!entry.isFile() || !matches(candidatePath)) {
+        continue;
+      }
+
+      try {
+        const candidateStat = await stat(candidatePath);
+        if (!best || candidateStat.mtimeMs > best.mtimeMs) {
+          best = {
+            path: candidatePath,
+            note,
+            mtimeMs: candidateStat.mtimeMs
+          };
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return best;
 }
 
 export async function writeJsonReport(filePath: string, report: unknown): Promise<void> {

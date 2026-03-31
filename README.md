@@ -52,9 +52,15 @@ npm run demo
 burnscope [input] [--report reports/out.json] [--format auto|events|claude-history|claude-project|codex-history|codex-session|codex-log]
 ```
 
-If you omit `input`, burnscope analyzes `samples/demo-session.jsonl`.
+If you omit `input`, burnscope auto-detects the most recent Claude Code or Codex artifact it can find on disk. It prefers richer sources first, so a fresh Codex rollout session or Claude project transcript beats a plain `history.jsonl`. If nothing is found, it falls back to `samples/demo-session.jsonl`.
 
 ## Examples
+
+Analyze the latest local artifact automatically:
+
+```bash
+npx tsx src/cli.ts
+```
 
 Analyze the bundled demo:
 
@@ -84,6 +90,13 @@ Analyze Codex operational warnings:
 
 ```bash
 npx tsx src/cli.ts ~/.codex/log/codex-tui.log
+```
+
+Force auto-discovery to stay within one source family:
+
+```bash
+npx tsx src/cli.ts --format codex-session
+npx tsx src/cli.ts --format claude-project
 ```
 
 ## Output

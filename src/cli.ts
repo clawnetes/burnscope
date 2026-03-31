@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { analyzeSession } from "./analysis.js";
 import { renderTerminalSummary } from "./format.js";
-import { loadSession, writeJsonReport } from "./io.js";
+import { loadSession, resolveInputPath, writeJsonReport } from "./io.js";
 import type { SessionInputFormat } from "./types.js";
 
 interface CliArgs {
@@ -53,7 +53,11 @@ function renderHelp(): string {
   return [
     "burnscope [input] [--report path] [--format auto|events|claude-history|claude-project|codex-history|codex-session|codex-log]",
     "",
+    "If you omit input, burnscope auto-detects the latest Claude Code or Codex artifact on this machine.",
+    "",
     "Examples:",
+    "  burnscope",
+    "  burnscope --format codex-session",
     "  burnscope samples/demo-session.jsonl",
     "  burnscope ~/.claude/history.jsonl",
     "  burnscope ~/.claude/projects/.../session.jsonl",
@@ -69,10 +73,15 @@ async function main(): Promise<void> {
     return;
   }
 
-  const inputPath = args.input ?? path.resolve("samples/demo-session.jsonl");
+  const resolvedInput = await resolveInputPath(args.input, { format: args.format });
+  const inputPath = resolvedInput.path;
   const reportPath = args.report ?? path.resolve("reports/burnscope-report.json");
 
   const loaded = await loadSession(inputPath, { format: args.format });
+  if (resolvedInput.discoveryNote) {
+    console.log(resolvedInput.discoveryNote);
+  }
+
   const analysis = analyzeSession(loaded.events);
   const report = {
     product: "burnscope",
